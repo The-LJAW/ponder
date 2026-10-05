@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ponder Privacy Policy</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/ponder.css" />
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main class="wrap legal">
+      <header class="brand"><img src="/icon.svg" alt="" width="32" height="32" /><a href="/">Ponder</a></header>
+      <h1>Privacy Policy</h1>
+      <p><em>Last updated: October 5, 2026</em></p>
+
+      <h2>What Ponder sends to its server</h2>
+      <p>
+        When you ask Ponder to study a video, the web app or Chrome extension sends the video's link and a random
+        install ID to the Ponder server. Nothing else. The extension only looks at the address of your current tab
+        when that tab is on YouTube or Vimeo, and it only sends that address when you press "Ponder this video".
+      </p>
+
+      <h2>What the server does with it</h2>
+      <p>
+        The server fetches the video's public transcript through a transcript provider (Supadata), sends the
+        transcript to Anthropic's Claude API to write the study pack, and returns the pack to you. Study packs are
+        cached by video for up to 30 days so the same video loads instantly for the next person. The random install
+        ID and your IP address are used only to count daily free uses and expire after two days.
+      </p>
+
+      <h2>What stays on your device</h2>
+      <p>
+        Your answers to the reflection questions and your history of study packs are stored only in your browser.
+        They are never sent to the server. Clearing your browser data or uninstalling the extension deletes them.
+      </p>
+
+      <h2>What Ponder does not do</h2>
+      <p>
+        No accounts, no ads, no tracking scripts, no selling or sharing of data. Ponder does not read your browsing
+        history, page contents, or anything on sites other than YouTube and Vimeo.
+      </p>
+
+      <h2>Contact</h2>
+      <p>Questions: open an issue at <a href="https://github.com/The-LJAW/ponder">github.com/The-LJAW/ponder</a>.</p>
+    </main>
+  </body>
+</html>

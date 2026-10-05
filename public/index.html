@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ponder: Study any video</title>
+    <meta
+      name="description"
+      content="Paste a YouTube or Vimeo link and get a study pack: summary, outline, flashcards, and reflection questions that push you to actually understand it."
+    />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="stylesheet" href="/ponder.css" />
+    <link rel="stylesheet" href="/app.css" />
+  </head>
+  <body>
+    <main class="wrap">
+      <header class="brand">
+        <img src="/icon.svg" alt="" width="32" height="32" />
+        <span>Ponder</span>
+      </header>
+
+      <section class="hero" id="hero">
+        <h1>Don't skip the video.<br />Understand it.</h1>
+        <p class="tagline">
+          Paste a YouTube or Vimeo link. Ponder gives you a summary, an outline, flashcards, and five
+          questions that make you think about what you watched.
+        </p>
+      </section>
+
+      <form class="ask" id="ask" autocomplete="off">
+        <label class="sr-only" for="url">Video link</label>
+        <input id="url" name="url" type="url" inputmode="url" placeholder="https://www.youtube.com/watch?v=…" required />
+        <button type="submit" id="go">Ponder it</button>
+      </form>
+      <p class="ask-foot">
+        <button type="button" class="linkish" id="sample">See a sample study pack</button>
+        <span id="quota"></span>
+      </p>
+
+      <div id="status" aria-live="polite"></div>
+      <div id="pack" class="pack"></div>
+
+      <section class="kinds" id="kinds">
+        <h2>Five kinds of questions, every video</h2>
+        <ul>
+          <li><b class="k-apply">Apply</b> How would you use this in your own life or work?</li>
+          <li><b class="k-connect">Connect</b> What does it link to that you already know?</li>
+          <li><b class="k-pushback">Push back</b> Where is the argument weakest?</li>
+          <li><b class="k-transfer">Transfer</b> Does the idea survive in a different domain?</li>
+          <li><b class="k-decide">Decide</b> Faced with a real choice, which way would you go?</li>
+        </ul>
+        <p>Not quiz questions checking whether you watched. The flashcards handle recall; these handle understanding.</p>
+      </section>
+
+      <footer class="site-foot">Ponder · Built for students and lifelong learners · <a href="/privacy.html">Privacy</a></footer>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

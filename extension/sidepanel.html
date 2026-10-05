@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Ponder</title>
+    <link rel="stylesheet" href="ponder.css" />
+    <link rel="stylesheet" href="sidepanel.css" />
+  </head>
+  <body>
+    <header class="bar">
+      <img src="icons/icon32.png" alt="" width="22" height="22" />
+      <span class="name">Ponder</span>
+      <span class="quota" id="quota"></span>
+    </header>
+
+    <main>
+      <section id="current" class="current" hidden>
+        <p class="eyebrow">On this tab</p>
+        <p class="vid-title" id="vid-title"></p>
+        <button id="go" class="go" type="button">Ponder this video</button>
+      </section>
+
+      <section id="empty" class="empty" hidden>
+        <h1>Don't skip the video. Understand it.</h1>
+        <p>Open a YouTube or Vimeo video, then come back here and press <b>Ponder this video</b>.</p>
+      </section>
+
+      <div id="status" aria-live="polite"></div>
+      <div id="pack" class="pack"></div>
+
+      <section id="recent" class="recent" hidden>
+        <h2>Recent</h2>
+        <ul id="recent-list"></ul>
+      </section>
+    </main>
+
+    <script type="module" src="sidepanel.js"></script>
+  </body>
+</html>
