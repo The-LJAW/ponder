@@ -5,7 +5,8 @@ The plan: launch the Chrome extension free, let installs and reviews build, then
 ## 1. Go live (this week)
 
 - [ ] Deploy to Vercel with `ANTHROPIC_API_KEY` and `SUPADATA_API_KEY`
-- [ ] Connect Upstash Redis (cache plus the free daily limit)
+- [ ] Connect Upstash Redis (required: cache plus usage limits)
+- [ ] Set the three account-level spending caps (Anthropic spend limit, Supadata Auto Recharge off, Vercel rate-limit rule). See "Protecting your bill" in the README
 - [ ] Run 5 to 10 real videos of different kinds (lecture, podcast, tutorial, talk) and read the reflection questions critically. Tune `SYSTEM_PROMPT` until every question passes the test "could this only have come from this video?"
 - [ ] Try `PONDER_MODEL=claude-sonnet-5-5` on the same videos and compare. Pick the model on question quality, not just cost.
 

@@ -9,6 +9,9 @@ import { SAMPLE_PACK } from '../lib/sample-pack.js';
 const ENV = { ANTHROPIC_API_KEY: 'test-a', SUPADATA_API_KEY: 'test-s', FREE_DAILY_LIMIT: '2' };
 const URL_A = 'https://www.youtube.com/watch?v=aaaaaaaaaaa';
 const URL_B = 'https://youtu.be/bbbbbbbbbbb';
+const DAY1 = new Date('2026-10-05T12:00:00Z');
+/** n distinct, valid YouTube links */
+const links = (n) => Array.from({ length: n }, (_, i) => `https://youtu.be/${String(i).padStart(11, 'x')}`);
 
 const json = (status, body) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
@@ -47,7 +50,7 @@ function fakeFetch({ transcriptStatus = 200, async = false } = {}) {
 
 test('happy path returns a full pack', async () => {
   const f = fakeFetch();
-  const { status, body } = await ponder({ url: URL_A, clientId: 'client-123' }, { env: ENV, fetch: f, store: null });
+  const { status, body } = await ponder({ url: URL_A, clientId: 'client-123' }, { env: ENV, fetch: f, store: createMemoryStore() });
   assert.equal(status, 200);
   assert.equal(body.ok, true);
   assert.equal(body.video.title, 'A Real Title');
@@ -67,11 +70,16 @@ test('rejects bad links before calling anything', async () => {
   assert.equal(f.calls.length, 0);
 });
 
-test('videos without captions give a friendly error', async () => {
-  const { status, body } = await ponder({ url: URL_A }, { env: ENV, fetch: fakeFetch({ transcriptStatus: 404 }), store: null });
+test('videos without captions give a friendly error and refund the use', async () => {
+  const store = createMemoryStore();
+  const deps = { env: ENV, fetch: fakeFetch({ transcriptStatus: 404 }), store, now: DAY1 };
+  const { status, body } = await ponder({ url: URL_A, clientId: 'client-123', ip: '1.2.3.4' }, deps);
   assert.equal(status, 422);
   assert.equal(body.error.code, 'no_transcript');
   assert.match(body.error.message, /captions/);
+  assert.equal(await store.get('quota:2026-10-05:c:client-123'), 0);
+  assert.equal(await store.get('quota:2026-10-05:ip:1.2.3.4'), 0);
+  assert.equal(await store.get('quota:2026-10-05:global'), 0);
 });
 
 test('polls Supadata when the transcript is processed async', async () => {
@@ -100,8 +108,7 @@ test('cache: second request for the same video makes no paid calls', async () =>
 test('free daily limit blocks new generations', async () => {
   const store = createMemoryStore();
   const f = fakeFetch();
-  const day = new Date('2026-10-05T12:00:00Z');
-  const deps = { env: ENV, fetch: f, store, now: day };
+  const deps = { env: ENV, fetch: f, store, now: DAY1 };
   assert.equal((await ponder({ url: URL_A, clientId: 'client-123', ip: '1.2.3.4' }, deps)).status, 200);
   assert.equal((await ponder({ url: URL_B, clientId: 'client-123', ip: '1.2.3.4' }, deps)).status, 200);
   const third = await ponder({ url: 'https://youtu.be/ccccccccccc', clientId: 'client-123', ip: '1.2.3.4' }, deps);
@@ -124,7 +131,7 @@ test('mock mode needs no keys and makes no calls', async () => {
 });
 
 test('missing keys report a config error, not a crash', async () => {
-  const { status, body } = await ponder({ url: URL_A }, { env: {}, fetch: fakeFetch(), store: null });
+  const { status, body } = await ponder({ url: URL_A }, { env: {}, fetch: fakeFetch(), store: createMemoryStore() });
   assert.equal(status, 500);
   assert.equal(body.error.code, 'config');
 });
@@ -171,4 +178,93 @@ Hello &amp; welcome
 00:00:04.000 --> 00:00:06.000
 to the lecture.`;
   assert.equal(vttToText(vtt), 'Hello & welcome to the lecture.');
+});
+
+test('fails closed: no usage store means no paid calls', async () => {
+  const f = fakeFetch();
+  const { status, body } = await ponder({ url: URL_A, clientId: 'client-123' }, { env: ENV, fetch: f, store: null });
+  assert.equal(status, 503);
+  assert.equal(body.error.code, 'config');
+  assert.equal(f.calls.length, 0);
+  // Explicit opt-out still works (for private testing only).
+  const allowed = await ponder({ url: URL_A }, { env: { ...ENV, PONDER_ALLOW_NO_LIMITS: '1' }, fetch: f, store: null });
+  assert.equal(allowed.status, 200);
+});
+
+test('fails closed: an unreachable store blocks generation', async () => {
+  const f = fakeFetch();
+  const broken = {
+    getJson: async () => null,
+    get: async () => 0,
+    incr: async () => {
+      throw new Error('ECONNRESET');
+    },
+    decr: async () => 0,
+    setJson: async () => {},
+  };
+  const { status, body } = await ponder({ url: URL_A, clientId: 'client-123' }, { env: ENV, fetch: f, store: broken });
+  assert.equal(status, 503);
+  assert.equal(body.error.code, 'busy');
+  assert.equal(f.count('https://api.anthropic.com'), 0);
+});
+
+test('a burst of parallel requests cannot exceed the per-install limit', async () => {
+  const store = createMemoryStore();
+  const f = fakeFetch();
+  const deps = { env: { ...ENV, FREE_DAILY_LIMIT: '5' }, fetch: f, store, now: DAY1 };
+  const results = await Promise.all(links(20).map((url) => ponder({ url, clientId: 'client-123' }, deps)));
+  assert.equal(results.filter((r) => r.status === 200).length, 5);
+  assert.equal(results.filter((r) => r.status === 429).length, 15);
+  assert.equal(f.count('https://api.anthropic.com'), 5);
+});
+
+test('rotating install IDs is caught by the per-IP limit', async () => {
+  const store = createMemoryStore();
+  const f = fakeFetch();
+  const deps = { env: { ...ENV, FREE_DAILY_LIMIT: '2' }, fetch: f, store, now: DAY1 };
+  const results = [];
+  for (const [i, url] of links(10).entries()) {
+    results.push(await ponder({ url, clientId: `rotating-id-${i}`, ip: '9.9.9.9' }, deps));
+  }
+  assert.equal(results.filter((r) => r.status === 200).length, 6); // 3x the per-install limit
+  assert.equal(f.count('https://api.anthropic.com'), 6);
+});
+
+test('global daily cap is a hard ceiling across many IPs', async () => {
+  const store = createMemoryStore();
+  const f = fakeFetch();
+  const deps = { env: { ...ENV, GLOBAL_DAILY_LIMIT: '4' }, fetch: f, store, now: DAY1 };
+  const results = await Promise.all(
+    links(12).map((url, i) => ponder({ url, clientId: `client-${i}-abc`, ip: `10.0.0.${i}` }, deps)),
+  );
+  assert.equal(results.filter((r) => r.status === 200).length, 4);
+  const capped = results.find((r) => r.status === 503);
+  assert.equal(capped.body.error.code, 'capacity');
+  assert.equal(f.count('https://api.anthropic.com'), 4);
+});
+
+test("one abuser's rejected requests don't use up global capacity", async () => {
+  const store = createMemoryStore();
+  const f = fakeFetch();
+  const deps = { env: { ...ENV, FREE_DAILY_LIMIT: '2', GLOBAL_DAILY_LIMIT: '5' }, fetch: f, store, now: DAY1 };
+  for (const url of links(30)) await ponder({ url, clientId: 'abuser-123', ip: '6.6.6.6' }, deps);
+  assert.equal(await store.get('quota:2026-10-05:global'), 2);
+  const someoneElse = await ponder({ url: URL_A, clientId: 'normal-user', ip: '7.7.7.7' }, deps);
+  assert.equal(someoneElse.status, 200);
+});
+
+test('hitting the Anthropic spend limit shows a capacity message and refunds the use', async () => {
+  const store = createMemoryStore();
+  const base = fakeFetch();
+  const f = async (url, init) =>
+    String(url) === 'https://api.anthropic.com/v1/messages'
+      ? new Response(
+          JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message: 'You have reached your specified API usage limits. You will regain access on 2026-11-01.' } }),
+          { status: 400 },
+        )
+      : base(url, init);
+  const { status, body } = await ponder({ url: URL_A, clientId: 'client-123' }, { env: ENV, fetch: f, store, now: DAY1 });
+  assert.equal(status, 503);
+  assert.equal(body.error.code, 'capacity');
+  assert.equal(await store.get('quota:2026-10-05:c:client-123'), 0);
 });

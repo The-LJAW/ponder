@@ -53,8 +53,32 @@ For real packs, copy `.env.example` to `.env`, add your two keys, and run `npm r
    - Supadata: https://supadata.ai (about $0.99 per 1,000 transcripts on paid plans)
 2. **Import the repo** at https://vercel.com/new and pick `The-LJAW/ponder`. Leave every build setting at its default.
 3. **Add environment variables** (Project > Settings > Environment Variables): `ANTHROPIC_API_KEY`, `SUPADATA_API_KEY`. The rest of `.env.example` is optional.
-4. **Add Upstash Redis** before sharing it publicly: Project > Storage > Marketplace > Upstash for Redis > connect. It sets the env vars for you and turns on the per-video cache and the free daily limit (`FREE_DAILY_LIMIT`, default 5). Without it there is no limit at all, so strangers could run up your bill.
+4. **Add Upstash Redis** (required): Project > Storage > Marketplace > Upstash for Redis > connect. It sets the env vars for you and powers the cache and usage limits. Until it's connected, the API refuses to generate packs.
 5. **Redeploy.** Your app is live at `https://<project>.vercel.app`.
+6. **Set the spending caps** in [Protecting your bill](#protecting-your-bill) before you share the link.
+
+## Protecting your bill
+
+Two layers. The app limits itself, and each provider has a hard cap as a backstop in case the app's limits are ever bypassed.
+
+**Built into the app** (`lib/handler.js`):
+
+| Limit | Default | Stops |
+| --- | --- | --- |
+| Per-video cache | 30 days | Paying twice for the same video |
+| Per install | 5 packs/day (`FREE_DAILY_LIMIT`) | Normal heavy use |
+| Per IP address | 15 packs/day (3x the above) | Someone clearing the extension to reset their limit |
+| Global | 200 packs/day (`GLOBAL_DAILY_LIMIT`) | Anything else, including bots on many IPs. Worst case about $12/day on Haiku, typically about $4 |
+
+Uses are counted before any paid call, so a burst of simultaneous requests can't slip past a limit. A failed pack gives the use back. If the database is missing or unreachable, the API refuses to generate rather than running without limits. The prompt and model are fixed on the server, and transcripts are capped at about 2.5 hours, so one pack can never cost more than about 6 cents.
+
+**Account-level caps (set these once):**
+
+1. **Anthropic:** Claude Console > Settings > Billing > Spend limits > set a monthly limit (for example $50). For a tighter fence, create a separate Ponder workspace with its own spend limit and make the API key in that workspace. The default workspace can't have its own limit. When a limit is hit, Ponder shows "busy" instead of spending more.
+2. **Supadata:** plans have a fixed number of credits (1 per transcript) and stop when they run out. Leave **Auto Recharge off**, and keep `SUPADATA_MODE=native` (AI transcription costs 2 credits per minute of video).
+3. **Vercel:** add one firewall rate-limit rule, available on every plan: Firewall > Configure > New Rule > if Request Path starts with `/api/ponder` > Rate Limit, 10 requests per 60s, keyed on IP. This blocks floods before they even reach your code. Vercel's Hobby plan is for non-commercial use, so move to Pro before you turn on billing.
+
+Watch the `pack` and `global_cap_hit` lines in Vercel's logs. If you hit the global cap on a normal day, that's growth: raise `GLOBAL_DAILY_LIMIT`.
 
 ## Load the Chrome extension
 
@@ -81,7 +105,7 @@ Want sharper questions? Set `PONDER_MODEL=claude-sonnet-5-5`. It costs roughly t
 ## Working on it
 
 ```bash
-npm test          # 16 tests: link parsing, pipeline, cache, limits, sync checks
+npm test          # 23 tests: link parsing, pipeline, cache, abuse limits, sync checks
 npm run sync      # copy shared files into public/ and extension/ after editing them
 ```
 
